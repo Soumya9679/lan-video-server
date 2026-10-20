@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+
+import { getVideos, type Video } from "./services/api";
 import {
   Activity,
   Clapperboard,
@@ -21,6 +23,10 @@ function App() {
   const [server, setServer] = useState<HealthResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [videosLoading, setVideosLoading] = useState(true);
+  const [videosError, setVideosError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +62,41 @@ function App() {
       cancelled = true;
     };
   }, []);
+  useEffect(() => {
+    let cancelled = false;
 
+    async function loadVideos() {
+      try {
+        const data = await getVideos();
+
+        if (!cancelled) {
+          setVideos(data.videos);
+          setVideosError(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setVideosError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load videos."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setVideosLoading(false);
+        }
+      }
+    }
+
+    loadVideos();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const filteredVideos = videos.filter((video) =>
+    video.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <div className="flex min-h-screen">
@@ -137,6 +177,8 @@ function App() {
                 type="search"
                 placeholder="Search your library..."
                 aria-label="Search your library"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
                 className="w-full bg-transparent text-sm outline-none placeholder:text-zinc-600"
               />
             </div>
@@ -249,20 +291,70 @@ function App() {
             </section>
 
             {/* Library placeholder */}
-            <section className="rounded-2xl border border-dashed border-white/15 bg-zinc-900/30 px-5 py-12 text-center sm:px-10">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5">
-                <Clapperboard size={26} className="text-zinc-400" />
+            <section>
+              <div className="mb-5 flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-semibold">Your Library</h3>
+                  <p className="mt-1 text-sm text-zinc-500">
+                    {videos.length} video{videos.length === 1 ? "" : "s"} discovered
+                  </p>
+                </div>
               </div>
 
-              <h3 className="mt-5 text-lg font-semibold">
-                Your library starts here
-              </h3>
+              {videosLoading ? (
+                <p className="py-10 text-center text-zinc-400">
+                  Scanning your library...
+                </p>
+              ) : videosError ? (
+                <p className="py-10 text-center text-red-400">
+                  {videosError}
+                </p>
+              ) : filteredVideos.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-white/15 p-10 text-center">
+                  <Clapperboard className="mx-auto text-zinc-500" size={32} />
 
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-500">
-                We haven't connected your video folder yet. In the next stage,
-                we'll build the Python library scanner and display your actual
-                videos here.
-              </p>
+                  <h4 className="mt-4 font-semibold">
+                    {videos.length === 0 ? "No videos found" : "No matching videos"}
+                  </h4>
+
+                  <p className="mt-2 text-sm text-zinc-500">
+                    {videos.length === 0
+                      ? "Add supported video files to your backend/Videos folder."
+                      : "Try another search term."}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {filteredVideos.map((video) => (
+                    <article
+                      key={video.id}
+                      className="rounded-2xl border border-white/10 bg-zinc-900/70 p-5 transition hover:border-violet-500/50"
+                    >
+                      <div className="flex h-32 items-center justify-center rounded-xl bg-gradient-to-br from-violet-950 to-zinc-800">
+                        <Clapperboard size={38} className="text-violet-300" />
+                      </div>
+
+                      <h4 className="mt-4 truncate font-semibold" title={video.title}>
+                        {video.title}
+                      </h4>
+
+                      <p className="mt-2 text-sm text-zinc-500">
+                        {video.extension.toUpperCase().replace(".", "")}
+                        {" · "}
+                        {video.size_mb.toFixed(2)} MB
+                      </p>
+
+                      <button
+                        type="button"
+                        disabled
+                        className="mt-4 w-full cursor-not-allowed rounded-xl bg-violet-600/40 px-4 py-2.5 text-sm font-medium text-violet-200"
+                      >
+                        Playback coming next
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              )}
             </section>
 
             {/* API information */}

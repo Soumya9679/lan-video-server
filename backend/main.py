@@ -1,14 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from video_library import scan_videos
+
 app = FastAPI(
     title="LAN Video Server",
     description="A personal media streaming server.",
     version="2.0.0",
 )
 
-# Development configuration.
-# We will tighten this when we configure production networking.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -32,4 +32,14 @@ def health_check():
         "status": "healthy",
         "application": "LAN Video Server",
         "version": "2.0.0",
+    }
+
+
+@app.get("/api/videos")
+def get_videos():
+    videos = scan_videos()
+
+    return {
+        "total": len(videos),
+        "videos": videos,
     }
